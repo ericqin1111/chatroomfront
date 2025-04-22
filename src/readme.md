@@ -1,0 +1,1 @@
+使用ws时创建websocket的新对象wsService，随后所有服务端的数据都会存储在wsService.state.data，使用ws发送数据时使用wsService.send(数据表)

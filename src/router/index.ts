@@ -10,6 +10,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/Home.vue'
 import Login from '../components/Login.vue';  // 引入 Login 组件
 import Register from '../components/Register.vue';  // 引入 Register 组件
+import Example from '../components/Example.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -30,6 +31,11 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: HomeView,
+    },
+    {
+      path: '/example',
+      name: 'example',
+      component: Example,
     },
 
   ],
