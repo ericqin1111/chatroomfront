@@ -35,18 +35,27 @@
 <script lang="ts">
 import request from '@/utils/request'
 import axios from 'axios'
+import {WebSocketService} from '@/utils/websocket'
+import { getCurrentInstance } from 'vue'
+
+
 
 export default {
+  setup(){
+    const instance = getCurrentInstance()
+    return {instance, }
+  },
   data() {
     return {
       loginForm: {
         username: '',
         password: '',
       },
+      instance: null,
     }
   },
 
-  
+
   methods: {
     onInput(field: keyof typeof this.loginForm) {
       console.log(this.loginForm[field]) // 确保输入及时更新
@@ -66,8 +75,12 @@ export default {
               const token = response.data;
               localStorage.setItem('token', token);
               console.log("Bearer:"+token);
+              //加载websocket,并挂载到全局
+              const ws = new WebSocketService('ws://localhost:8080/websocket?token=' + token)
+              this.instance.appContext.config.globalProperties.$ws = ws
+              console.log(this.$ws)
               // 处理成功逻辑，如跳转到主页
-              this.$router.push('/home')
+              this.$router.push('/example')
             })
             .catch((error) => {
               console.error('登录失败', error)

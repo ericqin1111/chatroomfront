@@ -15,10 +15,13 @@ import ElementPlus from 'element-plus';
 import 'element-plus/dist/index.css';  // 引入 Element Plus 样式
 
 
+
 const app = createApp(App)
 if (import.meta.env.PROD) {
     (app.config as unknown as { devtools: boolean }).devtools = false
   }
+app.config.globalProperties.$ws = null
+app.config.globalProperties.$token = null
 app.use(router)
 app.use(ElementPlus)
 app.mount('#app')

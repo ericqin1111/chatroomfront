@@ -122,7 +122,7 @@ export class WebSocketService{
 
 
   // 发送消息
-  send(data) {
+  sendMess(data) {
     if (this.ws.readyState === WebSocket.OPEN) {
 
       try {
@@ -148,6 +148,154 @@ export class WebSocketService{
     }
   };
 
+  // 发送消息
+  sendMessageToFriend(data) {
+    if (this.ws.readyState === WebSocket.OPEN) {
+
+      try {
+        // 序列化JSON
+        const jsonString = JSON.stringify(data)
+        const jsonBytes = new TextEncoder().encode(jsonString)
+
+        // 创建缓冲区（1字节类型 + JSON数据）
+        const buffer = new ArrayBuffer(1 + jsonBytes.length)
+        const view = new DataView(buffer)
+        view.setUint8(0, 2) // 业务数据标识
+
+        // 复制JSON数据
+        new Uint8Array(buffer, 1).set(jsonBytes)
+        console.log('data out');
+        // 发送
+        this.ws.send(buffer)
+        return true
+      } catch (error) {
+        console.error('发送数据错误:', error)
+        return false
+      }
+    }
+  };
+
+  // 发送消息
+  sendMessageToGroup(data) {
+    if (this.ws.readyState === WebSocket.OPEN) {
+
+      try {
+        // 序列化JSON
+        const jsonString = JSON.stringify(data)
+        const jsonBytes = new TextEncoder().encode(jsonString)
+
+        // 创建缓冲区（1字节类型 + JSON数据）
+        const buffer = new ArrayBuffer(1 + jsonBytes.length)
+        const view = new DataView(buffer)
+        view.setUint8(0, 3) // 业务数据标识
+
+        // 复制JSON数据
+        new Uint8Array(buffer, 1).set(jsonBytes)
+        console.log('data out');
+        // 发送
+        this.ws.send(buffer)
+        return true
+      } catch (error) {
+        console.error('发送数据错误:', error)
+        return false
+      }
+    }
+  };
+
+
+  // 发送消息
+  async sendMessageToFriend(data, file) {
+    if (this.ws.readyState === WebSocket.OPEN) {
+
+      try {
+
+      // 1. 读取文件为ArrayBuffer
+        const fileBuffer = await file.arrayBuffer();
+
+        // 2. 构造元数据（包含文件名、类型等）
+        const meta = {
+          ...data,
+          'fileName': file.name,
+          'fileType': file.type,
+          'fileSize': file.size
+        };
+        const metaJsonStr = JSON.stringify(meta);
+        const metaJsonBytes = new TextEncoder().encode(metaJsonStr);
+
+        // 3. 数据包格式：1字节类型 + 4字节JSON长度 + JSON元数据 + 文件内容
+        const totalLength = 1 + 4 + metaJsonBytes.length + fileBuffer.byteLength;
+        const buffer = new ArrayBuffer(totalLength);
+        const view = new DataView(buffer);
+
+
+        let offset = 0;
+        view.setUint8(offset, 4); // 表示文件类型
+        offset += 1;
+
+        view.setUint32(offset, metaJsonBytes.length); // 4字节，JSON长度
+        offset += 4;
+
+        // JSON元数据
+        new Uint8Array(buffer, offset, metaJsonBytes.length).set(metaJsonBytes);
+        offset += metaJsonBytes.length;
+
+        // 文件内容
+        new Uint8Array(buffer, offset).set(new Uint8Array(fileBuffer));
+        // 发送
+        this.ws.send(buffer)
+        return true
+      } catch (error) {
+        console.error('发送数据错误:', error)
+        return false
+      }
+    }
+  };
+  // 发送消息
+  async sendFileToGroup(data, file) {
+    if (this.ws.readyState === WebSocket.OPEN) {
+
+      try {
+         // 1. 读取文件为ArrayBuffer
+         const fileBuffer = await file.arrayBuffer();
+
+         // 2. 构造元数据（包含文件名、类型等）
+         const meta = {
+           ...data,
+           'fileName': file.name,
+           'fileType': file.type,
+           'fileSize': file.size
+         };
+         const metaJsonStr = JSON.stringify(meta);
+         const metaJsonBytes = new TextEncoder().encode(metaJsonStr);
+
+         // 3. 数据包格式：1字节类型 + 4字节JSON长度 + JSON元数据 + 文件内容
+         const totalLength = 1 + 4 + metaJsonBytes.length + fileBuffer.byteLength;
+         const buffer = new ArrayBuffer(totalLength);
+         const view = new DataView(buffer);
+
+
+         let offset = 0;
+         view.setUint8(offset, 5); // 表示文件类型
+         offset += 1;
+
+         view.setUint32(offset, metaJsonBytes.length); // 4字节，JSON长度
+         offset += 4;
+
+         // JSON元数据
+         new Uint8Array(buffer, offset, metaJsonBytes.length).set(metaJsonBytes);
+         offset += metaJsonBytes.length;
+
+         // 文件内容
+         new Uint8Array(buffer, offset).set(new Uint8Array(fileBuffer));
+         // 发送
+         this.ws.send(buffer)
+         return true
+      } catch (error) {
+        console.error('发送数据错误:', error)
+        return false
+      }
+    }
+  };
 
   // 关闭连接
   close() {
