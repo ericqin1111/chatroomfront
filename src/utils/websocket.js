@@ -139,7 +139,7 @@ export class WebSocketService{
         formatData['sentTime'] = jsonData.time
         formatData['contentType'] = 2;
       }else if(messageType === 3){
-        type = `group-${jsonData.from}`;
+        type = `group-${jsonData.target}`;
         formatData['messageId'] = jsonData.messId
         formatData['senderId'] = jsonData.from
         formatData['groupId'] = jsonData.target
@@ -147,7 +147,7 @@ export class WebSocketService{
         formatData['sentTime'] = jsonData.time
         formatData['contentType'] = 1;
       }else if(messageType === 5){
-        type = `group-${jsonData.from}`
+        type = `group-${jsonData.target}`
         formatData['messageId'] = jsonData.messId
         formatData['senderId'] = jsonData.from
         formatData['groupId'] = jsonData.target

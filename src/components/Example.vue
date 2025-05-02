@@ -22,7 +22,7 @@ export default {
   props: ['type', 'target'],
   computed: {
     messages() {
-      const key = 'friend-2';
+      const key = 'group-1';
       console.log('read the key=' + key)
       return messageMap[key] || [];
     }
@@ -40,7 +40,7 @@ export default {
   methods: {
     async sendMessage() {
       console.log('you send a data')
-      await this.$ws.sendMessageToFriend(this.form)
+      await this.$ws.sendMessageToGroup(this.form)
 
     },
     sendFile(event){
