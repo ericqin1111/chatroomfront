@@ -1,5 +1,6 @@
 
 import { reactive } from 'vue'
+import { messageMap } from '@/utils/messageStore';
 
 export class WebSocketService{
   constructor(url) {
@@ -54,11 +55,9 @@ export class WebSocketService{
         if (messageType === 1) {
           // 心跳包处理
           this.handleHeartbeat()
-        } else if (messageType === 0) {
+        } else{
           // 数据包处理
-          this.handleDataPacket(data)
-        } else {
-          console.warn('未知消息类型:', messageType)
+          this.handleDataPacket(data, messageType)
         }
       } catch (error) {
         console.error('消息处理错误:', error)
@@ -106,14 +105,61 @@ export class WebSocketService{
     this.ws.send(buffer)
   };
 
-  handleDataPacket(data) {
+  handleDataPacket(data, messageType) {
     try {
+      // 读取第一个字节判断消息类型
+
+
       // 跳过第一个字节（类型标识），解析剩余数据为JSON
       const jsonBytes = new Uint8Array(data, 1)
 
-      const jsonData = this.decoder.decode(jsonBytes);
-      this.state.data.push(jsonData);
+      const rawJsonData = this.decoder.decode(jsonBytes);
+
+      const jsonData = JSON.parse(rawJsonData);
       console.log('jd： ' + jsonData)
+
+      console.log('messageType:' + messageType)
+      let type = null;
+      const formatData = {};
+      console.log(jsonData)
+      if(messageType === 2){
+
+        type = `friend-${jsonData.from}`;
+
+        formatData['messageId'] = jsonData.messId
+        formatData['senderId'] = jsonData.from
+        formatData['content'] = jsonData.content
+        formatData['sentTime'] = jsonData.time
+        formatData['contentType'] = 1;
+      }else if(messageType === 4){
+        type = `friend-${jsonData.from}`;
+        formatData['messageId'] = jsonData.messId
+        formatData['senderId'] = jsonData.from
+        formatData['content'] = jsonData.fileName
+        formatData['sentTime'] = jsonData.time
+        formatData['contentType'] = 2;
+      }else if(messageType === 3){
+        type = `group-${jsonData.from}`;
+        formatData['messageId'] = jsonData.messId
+        formatData['senderId'] = jsonData.from
+        formatData['groupId'] = jsonData.target
+        formatData['content'] = jsonData.content
+        formatData['sentTime'] = jsonData.time
+        formatData['contentType'] = 1;
+      }else if(messageType === 5){
+        type = `group-${jsonData.from}`
+        formatData['messageId'] = jsonData.messId
+        formatData['senderId'] = jsonData.from
+        formatData['groupId'] = jsonData.target
+        formatData['content'] = jsonData.fileName
+        formatData['sentTime'] = jsonData.time
+        formatData['contentType'] = 2;
+      }
+      console.log(type)
+      if (!messageMap[type]) messageMap[type] = [];
+      console.log(messageMap)
+      messageMap[type].push(formatData); // 响应式
+
 
     } catch (error) {
       console.error('JSON解析错误:', error)
@@ -151,7 +197,7 @@ export class WebSocketService{
   // 发送消息
   sendMessageToFriend(data) {
     if (this.ws.readyState === WebSocket.OPEN) {
-
+      console.log('friend message sending')
       try {
         // 序列化JSON
         const jsonString = JSON.stringify(data)
@@ -204,9 +250,11 @@ export class WebSocketService{
 
 
   // 发送消息
-  async sendMessageToFriend(data, file) {
+  async sendFileToFriend(data, file) {
+    console.log('entered file friend')
     if (this.ws.readyState === WebSocket.OPEN) {
 
+      console.log('enter filesends to friend')
       try {
 
       // 1. 读取文件为ArrayBuffer

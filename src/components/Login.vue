@@ -78,7 +78,6 @@ export default {
               //加载websocket,并挂载到全局
               const ws = new WebSocketService('ws://localhost:8080/websocket?token=' + token)
               this.instance.appContext.config.globalProperties.$ws = ws
-              console.log(this.$ws)
               // 处理成功逻辑，如跳转到主页
               this.$router.push('/example')
             })
