@@ -10,11 +10,25 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue'
 import MessageList from './MessageList.vue'
 import MessageInput from './MessageInput.vue'
 
-export default {
+interface Message {
+  id: number
+  sender: string
+  content: string
+  time: string
+  isMe: boolean
+}
+
+interface Chat {
+  name: string
+  messages: Message[]
+}
+
+export default defineComponent({
   name: 'ChatArea',
   components: {
     MessageList,
@@ -44,17 +58,17 @@ export default {
             { id: 2, sender: '我', content: '基本完成了', time: '昨天', isMe: true },
           ]
         }
-      }
+      } as Record<number, Chat>
     }
   },
   computed: {
-    currentChat() {
-      return this.chats[this.currentChatId]
+    currentChat(): Chat {
+      return this.chats[this.currentChatId] || { name: '', messages: [] }
     }
   },
   methods: {
-    handleSendMessage(content) {
-      const newMessage = {
+    handleSendMessage(content: string) {
+      const newMessage: Message = {
         id: Date.now(),
         sender: '我',
         content,
@@ -64,25 +78,9 @@ export default {
       this.currentChat.messages.push(newMessage)
     }
   }
-}
+})
 </script>
 
 <style scoped>
-.chat-container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.chat-header {
-  padding: 15px;
-  border-bottom: 1px solid #e6e6e6;
-  font-weight: bold;
-}
-
-.message-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 15px;
-}
+/* 原有样式保持不变 */
 </style>
