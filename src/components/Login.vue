@@ -79,7 +79,7 @@ export default {
               const ws = new WebSocketService('ws://localhost:8080/websocket?token=' + token)
               this.instance.appContext.config.globalProperties.$ws = ws
               // 处理成功逻辑，如跳转到主页
-              this.$router.push('/example')
+              this.$router.push('/chat')
             })
             .catch((error) => {
               console.error('登录失败', error)
