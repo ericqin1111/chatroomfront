@@ -2,27 +2,76 @@
  * @Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
  * @Date: 2025-05-05 00:20:17
  * @LastEditors: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
- * @LastEditTime: 2025-05-05 00:58:31
+ * @LastEditTime: 2025-05-05 21:54:22
  * @FilePath: \chatroomreal\src\stores\chat.ts
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
+import { WebSocketService } from '@/utils/websocket.ts'
+import { useAuthStore } from './auth'
+import request from '@/utils/request'
 
 // 定义聊天消息和聊天的类型 (可以放到单独的 types 文件)
+// export interface Message {
+//   id: number | string // 消息 ID 可以是数字或字符串
+//   sender: string
+//   content: string
+//   time: string
+//   isMe: boolean
+// }
+
+// export interface Chat {
+//   id: number // 聊天本身的 ID
+//   type:string
+//   name: string
+//   messages: Message[]
+//   // 可能还有其他属性，如 type, avatar 等
+// }
+
 export interface Message {
-  id: number | string // 消息 ID 可以是数字或字符串
-  sender: string
-  content: string
-  time: string
-  isMe: boolean
+  id: number | string // 允许临时数字 ID 或后端字符串/数字 ID
+  sender: string // 发送者 ID 或特殊标识如 "我"
+  senderName?: string
+  senderAvatarUrl?: string
+  content: string // 消息内容 (文本或文件描述)
+  time: string // 时间字符串
+  isMe: boolean // 是否是自己发送的 (用于 UI 显示)
+  contentType?: number // 1: 文本, 2: 文件 (根据你的协议)
+  // 如果是文件，可能还需要 fileUrl, fileSize, fileName 等
+  fileUrl?: string
+  fileSize?: number
+  fileName?: string
 }
 
+// 聊天会话接口
 export interface Chat {
-  id: number // 聊天本身的 ID
-  name: string
-  messages: Message[]
-  // 可能还有其他属性，如 type, avatar 等
+  id: number // 聊天 ID (好友 ID 或群组 ID)
+  name: string // 聊天名称 (好友昵称或群名称)
+  type: 'friend' | 'group' // 聊天类型
+  avatarUrl?: string
+  messages: Message[] // 消息列表
+  unread?: number // 未读消息数 (用于侧边栏)
+  lastMessage?: string // 最后一条消息预览 (用于侧边栏)
+  time?: number // 最后消息时间 (用于侧边栏)
+  loadingMessages?: boolean // (可选) 标记是否正在加载消息
+  // 可能还有 avatar 等字段
+}
+
+// WebSocketService 发送方法所需的数据结构
+export interface SendData {
+  target: number
+  content?: string
+}
+
+// WebSocketService onmessage 回调接收的数据格式 (根据你的 handleDataPacket)
+export interface FormattedMessageData {
+  messageId: number | string
+  senderId: number // 注意：你的代码里 senderId 来自 jsonData.from，确认类型
+  content: string // 对于文件是 fileName
+  sentTime: string
+  contentType: number // 1: text, 2: file
+  groupId?: number // 群聊时才有
 }
 
 // ---------------- Pinia Store 定义 ----------------
@@ -33,34 +82,33 @@ export const useChatStore = defineStore('chat', () => {
 
   // 存储聊天数据的地方 (这里用 ref 包含一个对象)
   // 实际应用中，这些数据应该通过 API 获取并存储在这里
-  const chats = ref<Record<number, Chat>>({
-    // 示例模拟数据 (应替换为 API 获取)
-    1: {
-      id: 1,
-      name: '前端开发群',
-      messages: [
-        { id: 1, sender: '张三', content: '早上好！', time: '09:30', isMe: false },
-        { id: 2, sender: '我', content: '早上好！今天有什么计划？', time: '09:32', isMe: true },
-      ],
-    },
-    2: {
-      id: 2,
-      name: '张三',
-      messages: [
-        { id: 101, sender: '张三', content: '项目进展如何？', time: '昨天', isMe: false },
-        { id: 102, sender: '我', content: '基本完成了', time: '昨天', isMe: true },
-      ],
-    },
-    // ... 其他聊天数据
-  })
+  const authStore = useAuthStore()
+  const currentUserId = computed(() => authStore.userId)
 
-  // --- Actions ---
-  // 设置当前激活的聊天 ID
-  function setActiveChatId(id: number | null) {
-    activeChatId.value = id
-    console.log('[ChatStore] Active chat ID set to:', id) // 调试日志
-    // 可以在这里触发获取该聊天详细信息或消息列表的 API 调用（如果需要的话）
-  }
+  // const chats = ref<Record<number, Chat>>({
+  //   // 示例模拟数据 (应替换为 API 获取)
+  //   1: {
+  //     id: 1,
+  //     type:'group',
+  //     name: '前端开发群',
+  //     messages: [
+  //       { id: 1, sender: '张三', content: '早上好！', time: '09:30', isMe: false },
+  //       { id: 2, sender: '我', content: '早上好！今天有什么计划？', time: '09:32', isMe: true },
+  //     ],
+  //   },
+  //   2: {
+  //     id: 2,
+  //     type:'friend',
+  //     name: '张三',
+  //     messages: [
+  //       { id: 101, sender: '张三', content: '项目进展如何？', time: '昨天', isMe: false },
+  //       { id: 102, sender: '我', content: '基本完成了', time: '昨天', isMe: true },
+  //     ],
+  //   },
+  //   // ... 其他聊天数据
+  // })
+
+  const chats = ref<Record<number, Chat>>({})
 
   // 向当前激活的聊天添加新消息 (示例)
   function addMessageToActiveChat(message: Message) {
@@ -81,13 +129,220 @@ export const useChatStore = defineStore('chat', () => {
     return chats.value[activeChatId.value] || null // 从本地数据查找
   })
 
-  // 返回 state, actions, getters
-  return {
-    
-    activeChatId,
-    chats, // 也可以不直接暴露 chats，只暴露 currentChat
-    setActiveChatId,
-    addMessageToActiveChat,
-    currentChat,
+  const wsInstance = ref<WebSocketService | null>(null) // WebSocket 服务实例
+
+  const isWsConnected = computed(() => !!wsInstance.value && wsInstance.value.isConnected())
+
+  const chatListForSidebar = computed(() => {
+    return Object.values(chats.value).sort((a, b) => (b.time || 0) - (a.time || 0)) // 按时间戳倒序
+  })
+  // --- Actions ---
+  function setActiveChatId(id: number | null) {
+    activeChatId.value = id
+    console.log('[ChatStore] Active chat ID set to:', id)
+    // 可选：如果本地没有消息，可以在这里触发 API 加载历史消息
+    // if (id && (!chats.value[id] || chats.value[id].messages.length === 0)) {
+    //   fetchChatHistory(id);
+    // }
   }
-})
+
+  // **Action: 从后端 API 获取聊天列表**
+  async function fetchChatList() {
+    const userId = currentUserId.value
+    if (!userId) {
+        return
+    }
+    try {
+      const response = await request.get<Chat[]>(`/users/chat`)
+      const chatList: Chat[] = response.data // axios 数据在 response.data
+      console.log("数据"+response.data)
+
+      const newChats: Record<number, Chat> = {}
+      for (const chatData of chatList) {
+        newChats[chatData.id] = { ...chatData, messages: [] }
+      }
+      chats.value = newChats
+      console.log('[ChatStore] Chat list fetched and updated.')
+    } catch (error) {
+      console.error(`[ChatStore] Failed to fetch chat list for user ${userId}:`, error)
+    }
+  }
+
+  // **Action: 获取消息历史 (使用 request 实例)**
+  async function fetchMessages(chatId: number /*, pagination */) {
+    const userId = currentUserId.value
+    const chat = chats.value[chatId]
+    if (!userId || !chat || chat.loadingMessages) return
+
+    try {
+      chat.loadingMessages = true
+      console.log(`[ChatStore] Fetching messages for ${chat.type} chat ${chatId}...`)
+      const endpoint =
+        chat.type === 'friend'
+          ? `/api/users/${userId}/messages/friend/${chatId}` // 路径会自动拼接 baseURL
+          : `/api/users/${userId}/messages/group/${chatId}`
+      // TODO: 添加分页参数, e.g., { params: { limit: 20, offset: 0 } }
+
+      // 4. 使用导入的 request 实例
+      const response = await request.get<Message[]>(endpoint)
+      let messages: Message[] = response.data
+
+      messages = messages.map((msg) => ({
+        ...msg,
+        isMe: msg.sender === userId, // 假设 sender 是 ID
+      }))
+
+      chat.messages = messages.sort(
+        (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime(),
+      )
+      console.log(`[ChatStore] Messages updated for chat ${chatId}`)
+    } catch (error) {
+      console.error(`[ChatStore] Failed to fetch messages for chat ${chatId}:`, error)
+    } finally {
+      chat.loadingMessages = false
+    }
+  }
+
+  // 处理从 WebSocketService 收到的已格式化的消息数据
+  function handleIncomingMessage(data: FormattedMessageData) {
+    if (data.senderId === currentUserId.value) {
+      console.log('[ChatStore] Ignoring self-sent message echo.')
+      return
+    }
+
+    console.log('[ChatStore] Handling incoming WS message data:', data)
+    let targetChatId: number | null = null
+    const isMyMessage = false // 需要判断是否是自己发的消息
+
+    // 假设需要一个地方存储当前登录用户的 ID
+
+    const messageToAdd: Message = {
+      id: data.messageId,
+      sender: data.senderId.toString(), // 或者根据 senderId 查询用户名
+      content: data.content,
+      time:
+        data.sentTime || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isMe: isMyMessage, // **需要正确设置这个值**
+      contentType: data.contentType,
+      // 如果是文件，可能需要添加 fileName, fileSize, fileUrl
+      fileName: data.contentType === 2 ? data.content : undefined,
+      // fileUrl: data.fileUrl // 假设 service 能解析并传递 url
+    }
+
+    if ('groupId' in data && data.groupId) {
+      // 是群消息
+      targetChatId = data.groupId
+      // if (isMyMessage) { ... } // 自己发的群消息
+    } else {
+      // 是私聊消息
+      // 如果是自己发给别人的消息的回显，target 可能是对方ID
+      // 如果是别人发给我的消息，senderId 是对方 ID
+      targetChatId = data.senderId // **需要确认 targetId 是否在 data 中**
+      // *** 这里的逻辑需要根据你的后端具体实现来定 ***
+      // 最简单的情况：总是将收到的私聊消息归类到与对方 senderId 的聊天中
+      if (!isMyMessage) {
+        targetChatId = data.senderId
+      } else {
+        // 如果是自己的消息回显，需要知道发给了谁 (targetId)
+        // 这个信息可能需要在 FormattedMessageData 中包含
+        console.warn('Handling self-sent private message echo not fully implemented.')
+        // 可能需要 targetId from FormattedMessageData
+        // targetChatId = data.targetId;
+        return // 暂时忽略自己的消息回显，或者采取其他逻辑
+      }
+    }
+
+    if (targetChatId !== null) {
+      // 确保聊天对象存在于 state 中
+      if (!chats.value[targetChatId]) {
+        console.warn(
+          `Chat with ID ${targetChatId} not found in store. Creating placeholder or fetching.`,
+        )
+        // 实际应用需要先获取聊天信息
+        chats.value[targetChatId] = {
+          id: targetChatId,
+          name: `聊天 ${targetChatId}`, // 临时名称
+          type: 'groupId' in data && data.groupId ? 'group' : 'friend', // 推断类型
+          messages: [],
+        }
+      }
+      // 添加消息到对应的聊天记录
+      chats.value[targetChatId].messages.push(messageToAdd)
+      console.log(`Message added to chat ${targetChatId} in store.`)
+      // 可以在这里触发其他逻辑，比如更新侧边栏的 lastMessage (如果需要)
+    } else {
+      console.error('Could not determine target chat ID for incoming message.', data)
+    }
+  }
+
+  // 初始化 WebSocket
+  function initWebSocket(token: string) {
+    if (wsInstance.value) return // 防止重复初始化
+    const ws = new WebSocketService('ws://localhost:8080/websocket?token=' + token)
+
+    // 设置 Service 的回调来调用 Store Action
+    ws.onmessage = (formattedData) => {
+      handleIncomingMessage(formattedData)
+    }
+    ws.onopen = () => {
+      console.log('[ChatStore] WS Connected.') /* 更新 store 连接状态? */
+    }
+    ws.onclose = (event) => {
+      console.log('[ChatStore] WS Closed.')
+      wsInstance.value = null /* 清理实例 */ /* 更新 store 连接状态? */
+    }
+    ws.onerror = (error) => {
+      console.error('[ChatStore] WS Error.')
+      wsInstance.value = null /* 清理实例 */ /* 更新 store 连接状态? */
+    }
+
+    wsInstance.value = ws // 保存实例
+  }
+
+
+  // 断开 WebSocket
+  function disconnectWebSocket() {
+    wsInstance.value?.close() // 调用 Service 的 close 方法
+    wsInstance.value = null
+  }
+
+
+  // --- 发送 Actions ---
+  function sendMessageToFriend(targetId: number, content: string) {
+    wsInstance.value?.sendMessageToFriend({ target: targetId, content })
+  }
+  function sendMessageToGroup(targetId: number, content: string) {
+    wsInstance.value?.sendMessageToGroup({ target: targetId, content })
+  }
+  function sendFileToFriend(targetId: number, file: File, content?: string) {
+    wsInstance.value?.sendFileToFriend({ target: targetId, content }, file)
+  }
+  function sendFileToGroup(targetId: number, file: File, content?: string) {
+    wsInstance.value?.sendFileToGroup({ target: targetId, content }, file) // Service 中需要有此方法
+  }
+
+
+
+  // --- 返回 ---
+  return {
+    activeChatId,
+    chats,
+    wsInstance,
+    isWsConnected,
+    currentChat,
+    chatListForSidebar,
+    addMessageToActiveChat,
+    setActiveChatId,
+    handleIncomingMessage,
+    initWebSocket,
+    disconnectWebSocket,
+    sendMessageToFriend,
+    sendMessageToGroup,
+    sendFileToFriend,
+    sendFileToGroup,
+    fetchChatList,
+    fetchMessages,
+  }
+
+
+});

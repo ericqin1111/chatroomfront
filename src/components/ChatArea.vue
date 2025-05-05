@@ -1,49 +1,92 @@
-<template>
-  <div class="chat-area-wrapper" v-if="currentChat">
-    <div class="chat-header">
-      <div class="title">{{ currentChat.name }}</div>
-      </div>
-
-    <MessageList :messages="currentChat.messages" class="message-list-component" />
-
-    <MessageInput @send-message="handleSendMessage" class="message-input-component"/>
-  </div>
-
-  <div class="chat-placeholder" v-else>
-    请从左侧选择一个聊天开始
-  </div>
-</template>
-
 <script setup lang="ts">
-// <script setup> 部分保持之前的逻辑 (使用 Pinia store)
 import { computed, watch } from 'vue';
-import MessageList from './MessageList.vue'; // 导入子组件
+import MessageList from './MessageList.vue';
 import MessageInput from './MessageInput.vue';
-import { useChatStore, type Chat, type Message } from '@/stores/chat'; // 导入类型
+// 导入 Store 和需要的类型
+import { useChatStore, type Chat, type Message } from '@/stores/chat';
+// 导入 Auth Store 以获取当前用户 ID
+import { useAuthStore } from '@/stores/auth';
 
+// 获取 Store 实例
 const chatStore = useChatStore();
-const currentChat = computed(() => chatStore.currentChat);
+const authStore = useAuthStore(); // 获取 Auth Store
 
+// 从 Store 获取当前聊天信息
+const currentChat = computed(() => chatStore.currentChat);
+// 获取当前用户 ID (用于设置发送者)
+const currentUserId = computed(() => authStore.userId);
+
+// 调试日志 (可选)
 watch(currentChat, (newVal: Chat | null) => {
     console.log('ChatArea: Watched currentChat changed:', newVal);
 }, { immediate: true });
 
+// 处理发送消息的函数 (修改后)
 const handleSendMessage = (content: string) => {
-    if (!currentChat.value) return;
-    const newMessage: Message = {
-      id: Date.now(), sender: '我', content,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isMe: true,
-    };
-    chatStore.addMessageToActiveChat(newMessage);
-    // 发送消息到后端...
+  // 1. 检查当前是否有选中的聊天
+  if (!currentChat.value) {
+      console.error("无法发送消息：未选择聊天。");
+      return;
+  }
+  // 2. 检查 WebSocket 连接状态 (通过 Store getter)
+  if (!chatStore.isWsConnected) {
+      console.error("无法发送消息：WebSocket 未连接。");
+      // 可以给用户提示，例如使用 Element Plus 的 Message
+      // ElMessage.error('连接已断开，无法发送消息');
+      return;
+  }
+
+  // 3. 获取目标 ID 和类型
+  const targetId = currentChat.value.id;
+  const chatType = currentChat.value.type; // **确保 Chat 类型中有 type 字段**
+
+  // 4. 创建要在本地立即显示的消息对象
+  const newMessage: Message = {
+    id: `local-${Date.now()}`, // 本地临时唯一 ID
+    sender: currentUserId.value?.toString() || '我', // 设置发送者为当前用户
+    content: content,
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    isMe: true, // 标记为自己发送
+    contentType: 1, // 文本类型
+  };
+
+  // 5. **立即将消息添加到本地 Store**，以便 UI 快速反馈
+  chatStore.addMessageToActiveChat(newMessage);
+
+  // 6. **调用 Store Action，通过 WebSocket 发送消息到后端**
+  console.log(`准备发送消息到 ${chatType} ${targetId}`);
+  if (chatType === 'friend') { // 注意：你的 Chat 接口 type 是 'friend' 还是 'private'？这里用了 'private'
+    chatStore.sendMessageToFriend(targetId, content);
+  } else if (chatType === 'group') {
+    chatStore.sendMessageToGroup(targetId, content);
+  } else {
+    console.error("无法发送消息：未知的聊天类型:", chatType);
+    // 理论上不应该发生，除非数据有问题
+    // 可选：如果发送失败，是否要从本地移除刚刚添加的消息？（逻辑会变复杂）
+  }
 };
+
+// setup 默认会暴露所有顶层绑定给模板，所以不需要显式 return
+// （除非你需要 <script setup> 和 Options API 混用，但不推荐）
 </script>
 
 <script lang="ts">
 import { defineComponent } from 'vue';
 export default defineComponent({ name: 'ChatArea' });
 </script>
+
+<template>
+  <div class="chat-area-wrapper" v-if="currentChat">
+    <div class="chat-header">
+      <div class="title">{{ currentChat.name }}</div>
+    </div>
+    <MessageList :messages="currentChat.messages" class="message-list-component" />
+    <MessageInput @send-message="handleSendMessage" class="message-input-component"/>
+  </div>
+  <div class="chat-placeholder" v-else>
+    请从左侧选择一个聊天开始
+  </div>
+</template>
 
 <style scoped>
 .chat-area-wrapper {

@@ -36,6 +36,9 @@
 import request from '@/utils/request'
 import axios from 'axios'
 import {WebSocketService} from '@/utils/websocket'
+import { useChatStore} from '@/stores/chat';
+
+import {useAuthStore} from '@/stores/auth'
 import { getCurrentInstance } from 'vue'
 
 
@@ -64,22 +67,40 @@ export default {
       // 校验表单
       ;(this.$refs.loginForm as ElForm).validate((valid: boolean) => {
         if (valid) {
+          const chatStore = useChatStore();
           // 如果验证通过，进行登录请求
-          console.log('登录数据:', this.loginForm)
+          console.log('即将发送的登录数据对象:', this.loginForm); // <-- 确认对象结构
+          console.log('登录数据 (序列化尝试):', JSON.stringify(this.loginForm));
 
           // 使用 axios 发送登录请求
           axios
             .post('http://localhost:8080/login', this.loginForm)
             .then((response) => {
-              console.log('登录成功', response.data)
-              const token = response.data;
-              localStorage.setItem('token', token);
-              console.log("Bearer:"+token);
+              const { token, userId, username } = response.data;
+              
+              if (token && userId != null && username) {
+                console.log('登录成功，收到数据:', response.data);
+
+            // 使用 Pinia Auth Store 来存储状态
+                const authStore = useAuthStore();
+                authStore.loginSuccess(token, userId, username); // 将所有信息存入 store
+                localStorage.setItem('token', token);
+                console.log("Bearer:"+token);
               //加载websocket,并挂载到全局
-              const ws = new WebSocketService('ws://localhost:8080/websocket?token=' + token)
-              this.instance.appContext.config.globalProperties.$ws = ws
-              // 处理成功逻辑，如跳转到主页
-              this.$router.push('/chat')
+              // const ws = new WebSocketService('ws://localhost:8080/websocket?token=' + token)
+              // this.instance.appContext.config.globalProperties.$ws = ws
+              // // 处理成功逻辑，如跳转到主页
+              // this.$router.push('/chat')
+
+
+              chatStore.initWebSocket(token); // 调用 action
+              chatStore.fetchChatList(); 
+
+            // 处理成功逻辑，如跳转
+            // **跳转目标应该是 /chat，让 ChatLayout 加载**
+              // const redirectPath = this.$route.query.redirect || '/chat'; // 读取重定向前路径或默认 /chat
+                this.$router.push('/chat');
+              }
             })
             .catch((error) => {
               console.error('登录失败', error)

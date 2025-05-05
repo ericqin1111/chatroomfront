@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
   <div class="sidebar-container">
     <div class="tabs">
       <button
@@ -45,78 +45,161 @@
       </div>
     </div>
   </div>
+</template> -->
+
+<template>
+  <div class="sidebar-container">
+    <div class="tabs">
+      <button
+        v-for="tab in tabs"
+        :key="tab.id"
+        :class="{ active: tab.id === activeTab }"
+        @click="activeTab = tab.id"
+        class="tab-button"
+      >
+        {{ tab.name }}
+      </button>
+    </div>
+
+    <div class="content-list">
+      <ul class="chat-list" v-if="activeTab === 'chat'">
+        <li
+          v-for="chat in chatListForSidebar"
+          :key="chat.id"
+          :class="{ active: chat.id === activeChatId }" @click="selectChat(chat.id)"
+          class="chat-item"
+        >
+          <div class="avatar-placeholder">
+              {{ chat.name.substring(0, 1) }}
+          </div>
+          <div class="chat-info">
+            <div class="chat-header">
+              <span class="chat-name">{{ chat.name }}</span>
+              <span class="chat-time">{{ chat.lastMessageTime }}</span>
+            </div>
+            <div class="chat-message-row">
+              <span class="chat-message">{{ chat.lastMessageContent }}</span>
+              <span class="unread-badge" v-if="chat.unreadCount && chat.unreadCount > 0">{{ chat.unreadCount }}</span>
+            </div>
+          </div>
+        </li>
+      </ul>
+
+      <div class="contact-list" v-if="activeTab === 'contact'">
+        <p>这里显示联系人列表...</p>
+        </div>
+
+      <div class="collect-list" v-if="activeTab === 'collect'">
+        <p>这里显示收藏列表...</p>
+        </div>
+    </div>
+  </div>
 </template>
 
-<script lang="ts">
+<script setup lang="ts">
 // 导入需要的 Vue API 和 Pinia Store
 import { defineComponent, ref, computed } from 'vue'
-import { useChatStore } from '@/stores/chat' // 确认路径正确
+import { useChatStore,type Chat } from '@/stores/chat' // 确认路径正确
+
 
 // 接口定义
 interface Tab {
   id: string
   name: string
 }
-interface Chat {
-  id: number
-  name: string
-  lastMessage: string
-  time: string
-  unread: number
-  type: 'group' | 'private'
-}
 
+// 获取 Pinia store 实例
+const chatStore = useChatStore();
+
+// --- 定义响应式状态 ---
+
+// 控制当前激活的 Tab (本地状态)
+const activeTab = ref('chat');
+
+// **这里定义了 Tab 按钮的数据**
+const tabs = ref<Tab[]>([
+  { id: 'chat', name: '聊天' },     // <-- 你问的这行代码在这里
+  { id: 'contact', name: '联系人' },
+  { id: 'collect', name: '收藏' },
+  // 你可以在这里添加或修改 Tab
+]);
+
+// 从 store 获取计算好的、排序后的聊天列表，用于 v-for
+const chatListForSidebar = computed(() => chatStore.chatListForSidebar);
+
+// 从 store 获取当前激活的聊天 ID，用于高亮列表项
+const activeChatId = computed(() => chatStore.activeChatId);
+
+// --- 定义方法 ---
+
+// 当用户点击聊天列表项时调用
+const selectChat = (chatId: number) => {
+  // 只调用 Pinia Action 来更新全局激活的聊天 ID
+  chatStore.setActiveChatId(chatId);
+  console.log(`Sidebar: Set active chat ID in store to: ${chatId}`);
+};
+
+// setup 语法糖会自动暴露顶层绑定给模板，无需 return
+</script>
+
+<script lang="ts">
+import { defineComponent } from 'vue';
 export default defineComponent({
   name: 'AppSidebar',
-  // 声明会触发的事件
-  emits: ['chat-selected'],
+});
 
-  setup(props, { emit }) {
-    // 获取 Pinia store 实例
-    const chatStore = useChatStore();
 
-    // 定义响应式状态 (替代 data)
-    const activeTab = ref('chat');
-    const tabs = ref<Tab[]>([
-      { id: 'chat', name: '聊天' },
-      { id: 'contact', name: '联系人' },
-      { id: 'collect', name: '收藏' },
-    ]);
-    // 本地模拟聊天列表数据 (实际应用中应来自 Store 或 API)
-    const chats = ref<Chat[]>([
-        { id: 1, name: '前端开发群', lastMessage: '大家早上好！', time: '09:30', unread: 2, type: 'group' },
-        { id: 2, name: '张三', lastMessage: '项目进展如何？', time: '昨天', unread: 0, type: 'private' },
-        { id: 3, name: '李四', lastMessage: '晚上一起吃饭吗？', time: '星期一', unread: 1, type: 'private' },
-        { id: 4, name: '项目讨论组', lastMessage: 'UI设计稿已更新', time: '2023/12/1', unread: 0, type: 'group' },
-    ]);
-    // 用于 UI 高亮的本地激活聊天 ID 状态
-    const activeChat = ref(1); // 可以根据 store 的初始值来设置，或者默认为 null
+// export default defineComponent({
+//   name: 'AppSidebar',
+//   // 声明会触发的事件
+//   emits: ['chat-selected'],
 
-    // 定义计算属性 (替代 computed)
-    const filteredChats = computed<Chat[]>(() => {
-      // 这里可以根据需要添加搜索过滤等逻辑
-      return chats.value;
-    });
+//   setup(props, { emit }) {
+//     // 获取 Pinia store 实例
+//     const chatStore = useChatStore();
 
-    // 定义方法 (替代 methods)
-    const selectChat = (chatId: number) => {
-      activeChat.value = chatId;         // 更新本地 UI 高亮状态
-      emit('chat-selected', chatId);    // 触发事件 (如果需要)
-      chatStore.setActiveChatId(chatId); // **只更新 Pinia store 状态**
-      console.log(`Sidebar: Set active chat ID in store to: ${chatId}`);
-      // **确保没有 router.push(...) 调用**
-    };
+//     // 定义响应式状态 (替代 data)
+//     const activeTab = ref('chat');
+//     const tabs = ref<Tab[]>([
+//       { id: 'chat', name: '聊天' },
+//       { id: 'contact', name: '联系人' },
+//       { id: 'collect', name: '收藏' },
+//     ]);
+//     // 本地模拟聊天列表数据 (实际应用中应来自 Store 或 API)
+//     const chats = ref<Chat[]>([
+//         { id: 1, name: '前端开发群', lastMessage: '大家早上好！', time: '09:30', unread: 2, type: 'group' },
+//         { id: 2, name: '张三', lastMessage: '项目进展如何？', time: '昨天', unread: 0, type: 'private' },
+//         { id: 3, name: '李四', lastMessage: '晚上一起吃饭吗？', time: '星期一', unread: 1, type: 'private' },
+//         { id: 4, name: '项目讨论组', lastMessage: 'UI设计稿已更新', time: '2023/12/1', unread: 0, type: 'group' },
+//     ]);
+//     // 用于 UI 高亮的本地激活聊天 ID 状态
+//     const activeChat = ref(1); // 可以根据 store 的初始值来设置，或者默认为 null
 
-    // 返回所有模板需要使用的变量和函数
-    return {
-      activeTab,
-      tabs,
-      activeChat,
-      filteredChats,
-      selectChat,
-    };
-  },
-})
+//     // 定义计算属性 (替代 computed)
+//     const filteredChats = computed<Chat[]>(() => {
+//       // 这里可以根据需要添加搜索过滤等逻辑
+//       return chats.value;
+//     });
+
+//     // 定义方法 (替代 methods)
+//     const selectChat = (chatId: number) => {
+//       activeChat.value = chatId;         // 更新本地 UI 高亮状态
+//       emit('chat-selected', chatId);    // 触发事件 (如果需要)
+//       chatStore.setActiveChatId(chatId); // **只更新 Pinia store 状态**
+//       console.log(`Sidebar: Set active chat ID in store to: ${chatId}`);
+//       // **确保没有 router.push(...) 调用**
+//     };
+
+//     // 返回所有模板需要使用的变量和函数
+//     return {
+//       activeTab,
+//       tabs,
+//       activeChat,
+//       filteredChats,
+//       selectChat,
+//     };
+//   },
+// })
 </script>
 
 <style scoped>
