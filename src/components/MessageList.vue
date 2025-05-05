@@ -6,6 +6,7 @@
       class="message-item"
       :class="message.isMe ? 'my-message' : 'other-message'"
     >
+
       <div class="message-bubble">
         <p class="message-content">{{ message.content }}</p>
       </div>

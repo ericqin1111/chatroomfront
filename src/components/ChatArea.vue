@@ -21,6 +21,34 @@ watch(currentChat, (newVal: Chat | null) => {
     console.log('ChatArea: Watched currentChat changed:', newVal);
 }, { immediate: true });
 
+const activeChatId = computed(() => chatStore.activeChatId);
+watch(activeChatId, (newId, oldId) => {
+  // 当 activeChatId 变化且不为 null 时
+  if (newId !== null && newId !== oldId) {
+    // 尝试从 store 获取新选中的聊天数据
+    const chat = chatStore.chats[newId];
+    if (chat) {
+      // 检查本地是否已有消息，或者是否需要强制刷新
+      // 简化逻辑：如果 messages 数组为空，则调用 action 加载
+      if (!chat.messages || chat.messages.length === 0) {
+         console.log(`ChatArea: Active chat ID changed to ${newId}, fetching messages...`);
+         // 调用 Pinia Action 获取该聊天的消息历史
+         // fetchMessages action 内部会使用 currentUserId
+         chatStore.fetchMessages(newId);
+      } else {
+          console.log(`ChatArea: Chat ID ${newId} already has messages locally.`);
+          // 如果需要每次切换都刷新，可以在这里也调用 fetchMessages
+          // 或者，如果 MessageList 实现了滚动加载更多，这里就不需要做什么
+      }
+    } else {
+        // 这种情况可能发生在 fetchChatList 慢于 setActiveChatId 时
+        console.warn(`ChatArea: Chat data for ID ${newId} not found in store immediately after activation. Waiting for fetchChatList?`);
+        // 也可以在这里尝试调用一次 fetchMessages，让 action 内部处理 chat 不存在的情况
+        // chatStore.fetchMessages(newId);
+    }
+  }
+}, { immediate: true });
+
 // 处理发送消息的函数 (修改后)
 const handleSendMessage = (content: string) => {
   // 1. 检查当前是否有选中的聊天
