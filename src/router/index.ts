@@ -112,11 +112,13 @@ router.beforeEach((to, from, next) => {
       // 将用户原本想访问的路径作为查询参数传递，方便登录后跳回
       query: { redirect: to.fullPath },
     })
-  } else if ((to.name === 'Login' || to.name === 'register') && isAuthenticated) {
-    // 可选逻辑: 如果用户已登录，但尝试访问登录或注册页面
-    // 则将他们重定向到其他页面 (例如首页或聊天页)
-    next({ name: 'home' }) // 重定向到首页
-  } else {
+  } 
+  
+  // else if ((to.name === 'Login' || to.name === 'register') && isAuthenticated) {
+  //   // 可选逻辑: 如果用户已登录，但尝试访问登录或注册页面
+  //   // 则将他们重定向到其他页面 (例如首页或聊天页)
+  //   next({ name: 'home' }) // 重定向到首页
+   else {
     // 其他所有情况 (无需验证 或 已登录且访问需验证页面)，正常放行
     next()
   }

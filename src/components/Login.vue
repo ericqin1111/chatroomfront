@@ -94,6 +94,7 @@ export default {
 
 
               chatStore.initWebSocket(token); // 调用 action
+              // chatStore.fetchFriendRequests();
               chatStore.fetchChatList(); 
 
             // 处理成功逻辑，如跳转
