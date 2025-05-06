@@ -7,20 +7,41 @@
       :class="message.isMe ? 'my-message' : 'other-message'"
     >
 
-      <div class="message-bubble">
+    <!-- <div class="avatar-placeholder" v-if="!message.isMe">
+         {{ message.senderName ? message.senderName.substring(0,1) : (message.sender ? message.sender.substring(0,1) : '?') }}
+    </div> -->
+
+      <div class="message-content-wrapper">
+        <!-- <div class="sender-name" v-if="!message.isMe /* && isGroupProp */">
+          {{ message.senderName || `${message.sender}` }}
+        </div> -->
+        <div class="message-bubble">
+          <p class="message-content" v-if="message.contentType === 1 || !message.contentType">
+            {{ message.content }}
+          </p>
+          <div class="file-message" v-else-if="message.contentType === 2">
+             <i class="file-icon">📄</i>
+             <span>{{ message.fileName || message.content }}</span>
+          </div>
+        </div>
+        <span class="message-time">{{ formatDisplayTime(message.time) }}</span>
+      </div>
+
+      <!-- <div class="message-bubble">
         <p class="message-content">{{ message.content }}</p>
       </div>
       <span class="message-time">{{ message.time }}</span>
-    </div>
+      </div> -->
+  </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { defineProps, ref, watch, nextTick, onMounted, type PropType } from 'vue';
+import { type Message } from '@/stores/chat';
 
 // 假设 Message 类型已在全局或 types 文件中定义并导出
 // 如果没有，需要在此处或全局定义
-interface Message { id: number | string; sender: string; content: string; time: string; isMe: boolean; }
 
 const props = defineProps({
   messages: {
@@ -40,6 +61,17 @@ const scrollToBottom = async () => {
   if (container) {
     container.scrollTop = container.scrollHeight;
   }
+};
+
+const formatDisplayTime = (timeStr: string | undefined): string => {
+    if (!timeStr) return '';
+    try {
+        const date = new Date(timeStr);
+        if (isNaN(date.getTime())) return timeStr;
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+    } catch (e) { return timeStr; }
 };
 
 // 监听消息数组变化，自动滚动到底部
@@ -70,6 +102,10 @@ onMounted(() => {
 
 .my-message {
   justify-content: flex-end; /* 内容（头像、气泡+时间）靠右 */
+}
+
+.my-message .message-time{
+    left:8px;
 }
 
 .other-message {

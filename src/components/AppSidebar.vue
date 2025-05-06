@@ -148,58 +148,6 @@ export default defineComponent({
   name: 'AppSidebar',
 });
 
-
-// export default defineComponent({
-//   name: 'AppSidebar',
-//   // 声明会触发的事件
-//   emits: ['chat-selected'],
-
-//   setup(props, { emit }) {
-//     // 获取 Pinia store 实例
-//     const chatStore = useChatStore();
-
-//     // 定义响应式状态 (替代 data)
-//     const activeTab = ref('chat');
-//     const tabs = ref<Tab[]>([
-//       { id: 'chat', name: '聊天' },
-//       { id: 'contact', name: '联系人' },
-//       { id: 'collect', name: '收藏' },
-//     ]);
-//     // 本地模拟聊天列表数据 (实际应用中应来自 Store 或 API)
-//     const chats = ref<Chat[]>([
-//         { id: 1, name: '前端开发群', lastMessage: '大家早上好！', time: '09:30', unread: 2, type: 'group' },
-//         { id: 2, name: '张三', lastMessage: '项目进展如何？', time: '昨天', unread: 0, type: 'private' },
-//         { id: 3, name: '李四', lastMessage: '晚上一起吃饭吗？', time: '星期一', unread: 1, type: 'private' },
-//         { id: 4, name: '项目讨论组', lastMessage: 'UI设计稿已更新', time: '2023/12/1', unread: 0, type: 'group' },
-//     ]);
-//     // 用于 UI 高亮的本地激活聊天 ID 状态
-//     const activeChat = ref(1); // 可以根据 store 的初始值来设置，或者默认为 null
-
-//     // 定义计算属性 (替代 computed)
-//     const filteredChats = computed<Chat[]>(() => {
-//       // 这里可以根据需要添加搜索过滤等逻辑
-//       return chats.value;
-//     });
-
-//     // 定义方法 (替代 methods)
-//     const selectChat = (chatId: number) => {
-//       activeChat.value = chatId;         // 更新本地 UI 高亮状态
-//       emit('chat-selected', chatId);    // 触发事件 (如果需要)
-//       chatStore.setActiveChatId(chatId); // **只更新 Pinia store 状态**
-//       console.log(`Sidebar: Set active chat ID in store to: ${chatId}`);
-//       // **确保没有 router.push(...) 调用**
-//     };
-
-//     // 返回所有模板需要使用的变量和函数
-//     return {
-//       activeTab,
-//       tabs,
-//       activeChat,
-//       filteredChats,
-//       selectChat,
-//     };
-//   },
-// })
 </script>
 
 <style scoped>

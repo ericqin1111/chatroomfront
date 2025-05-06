@@ -2,7 +2,7 @@
  * @Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
  * @Date: 2025-05-05 00:20:17
  * @LastEditors: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
- * @LastEditTime: 2025-05-06 01:07:56
+ * @LastEditTime: 2025-05-06 12:02:47
  * @FilePath: \chatroomreal\src\stores\chat.ts
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -98,29 +98,6 @@ export const useChatStore = defineStore('chat', () => {
   const authStore = useAuthStore()
   const currentUserId = computed(() => authStore.userId)
 
-  // const chats = ref<Record<number, Chat>>({
-  //   // 示例模拟数据 (应替换为 API 获取)
-  //   1: {
-  //     id: 1,
-  //     type:'group',
-  //     name: '前端开发群',
-  //     messages: [
-  //       { id: 1, sender: '张三', content: '早上好！', time: '09:30', isMe: false },
-  //       { id: 2, sender: '我', content: '早上好！今天有什么计划？', time: '09:32', isMe: true },
-  //     ],
-  //   },
-  //   2: {
-  //     id: 2,
-  //     type:'friend',
-  //     name: '张三',
-  //     messages: [
-  //       { id: 101, sender: '张三', content: '项目进展如何？', time: '昨天', isMe: false },
-  //       { id: 102, sender: '我', content: '基本完成了', time: '昨天', isMe: true },
-  //     ],
-  //   },
-  //   // ... 其他聊天数据
-  // })
-
   const chats = ref<Record<number, Chat>>({})
 
   // 向当前激活的聊天添加新消息 (示例)
@@ -154,9 +131,10 @@ export const useChatStore = defineStore('chat', () => {
     activeChatId.value = id
     console.log('[ChatStore] Active chat ID set to:', id)
     // 可选：如果本地没有消息，可以在这里触发 API 加载历史消息
-    // if (id && (!chats.value[id] || chats.value[id].messages.length === 0)) {
-    //   fetchChatHistory(id);
-    // }
+ 
+    if (id && (!chats.value[id] || chats.value[id].messages.length === 0)) {
+      fetchMessages(id);
+    }
   }
 
   // **Action: 从后端 API 获取聊天列表**
