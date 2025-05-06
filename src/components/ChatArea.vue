@@ -49,24 +49,23 @@ watch(activeChatId, (newId, oldId) => {
   }
 }, { immediate: true });
 
-// 处理发送消息的函数 (修改后)
+
 const handleSendMessage = (content: string) => {
   // 1. 检查当前是否有选中的聊天
   if (!currentChat.value) {
       console.error("无法发送消息：未选择聊天。");
       return;
   }
-  // 2. 检查 WebSocket 连接状态 (通过 Store getter)
+  // 2. 检查 WebSocket 连接状态
   if (!chatStore.isWsConnected) {
       console.error("无法发送消息：WebSocket 未连接。");
-      // 可以给用户提示，例如使用 Element Plus 的 Message
-      // ElMessage.error('连接已断开，无法发送消息');
+      // 可以给用户提示，例如: ElMessage.error('连接已断开，无法发送消息');
       return;
   }
 
   // 3. 获取目标 ID 和类型
   const targetId = currentChat.value.id;
-  const chatType = currentChat.value.type; // **确保 Chat 类型中有 type 字段**
+  const chatType = currentChat.value.type; // 确保 Chat 类型中有 type 字段
 
   // 4. 创建要在本地立即显示的消息对象
   const newMessage: Message = {
@@ -75,22 +74,73 @@ const handleSendMessage = (content: string) => {
     content: content,
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     isMe: true, // 标记为自己发送
-    contentType: 1, // 文本类型
+    contentType: 1, // 假设 1 = 文本类型
   };
 
-  // 5. **立即将消息添加到本地 Store**，以便 UI 快速反馈
   chatStore.addMessageToActiveChat(newMessage);
 
-  // 6. **调用 Store Action，通过 WebSocket 发送消息到后端**
-  console.log(`准备发送消息到 ${chatType} ${targetId}`);
-  if (chatType === 'friend') { // 注意：你的 Chat 接口 type 是 'friend' 还是 'private'？这里用了 'private'
-    chatStore.sendMessageToFriend(targetId, content);
+// 6. **调用 Store Action，通过 WebSocket 发送消息到后端**
+console.log(`准备发送消息到 ${chatType} ${targetId}`);
+if (chatType === 'friend') { // 注意：确认您的 Chat 接口 type 是 'friend' 还是其他？
+  chatStore.sendMessageToFriend(targetId, content);
+} else if (chatType === 'group') {
+  chatStore.sendMessageToGroup(targetId, content);
+} else {
+  console.error("无法发送消息：未知的聊天类型:", chatType);
+}
+}
+
+// --- 新增的 handleSendFile 函数 ---
+const handleSendFile = (file: File) => {
+  // 1. 检查当前是否有选中的聊天
+  if (!currentChat.value) {
+      console.error("无法发送文件：未选择聊天。");
+      return;
+  }
+  // 2. 检查 WebSocket 连接状态 (重要：文件信息可能在上传后通过 WS 发送)
+  if (!chatStore.isWsConnected) {
+      console.error("无法发送文件：WebSocket 未连接。");
+      // 可以给用户提示，例如: ElMessage.error('连接已断开，无法发送文件');
+      return;
+  }
+
+  // 3. 获取目标 ID 和类型
+  const targetId = currentChat.value.id;
+  const chatType = currentChat.value.type;
+
+  // --- 可选步骤 4: 本地反馈 (立即显示文件) ---
+  // 创建一个临时的本地消息对象，代表正在上传的文件
+  const tempFileMessage: Message = {
+      id: `local-file-${Date.now()}`, // 临时本地文件消息 ID
+      sender: currentUserId.value?.toString() || '我',
+      content: '', // 文件消息通常没有文本内容
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isMe: true, // 是自己发送的
+      contentType: 2, // 假设 2 = 文件类型 (根据您的类型定义调整)
+      fileName: file.name, // 文件名
+      fileSize: file.size, // 文件大小
+      // 您可以在这里添加一个“正在上传”的状态
+      // status: 'uploading', // 示例状态: "uploading", "success", "error"
+      // 如果需要本地预览，可以创建临时 URL (记得稍后 revokeObjectURL)
+      // fileUrl: URL.createObjectURL(file)
+  };
+  // 将临时消息添加到 Store，以便 UI 立即更新
+  chatStore.addMessageToActiveChat(tempFileMessage);
+  // --- 可选步骤 4 结束 ---
+
+
+  // 5. **调用新的 Store Action 来处理文件上传和消息发送**
+  console.log(`准备发送文件 ${file.name} 到 ${chatType} ${targetId}`);
+  if (chatType === 'friend') {
+      // 您需要在您的 Store 中创建这个 Action
+      chatStore.sendFileToFriend(targetId, file, tempFileMessage.id); // 传入临时 ID 以便后续更新状态
   } else if (chatType === 'group') {
-    chatStore.sendMessageToGroup(targetId, content);
+      // 您需要在您的 Store 中创建这个 Action
+      chatStore.sendFileToGroup(targetId, file, tempFileMessage.id); // 传入临时 ID 以便后续更新状态
   } else {
-    console.error("无法发送消息：未知的聊天类型:", chatType);
-    // 理论上不应该发生，除非数据有问题
-    // 可选：如果发送失败，是否要从本地移除刚刚添加的消息？（逻辑会变复杂）
+      console.error("无法发送文件：未知的聊天类型:", chatType);
+      // 可选：如果类型错误，从本地移除刚添加的临时消息
+      // chatStore.removeMessageById(tempFileMessage.id);
   }
 };
 
@@ -109,7 +159,14 @@ export default defineComponent({ name: 'ChatArea' });
       <div class="title">{{ currentChat.name }}</div>
     </div>
     <MessageList :messages="currentChat.messages" class="message-list-component" />
-    <MessageInput @send-message="handleSendMessage" class="message-input-component"/>
+    <!-- <MessageInput @send-message="handleSendMessage" class="message-input-component"/> -->
+    <MessageInput
+      v-if="currentChat"
+      @send-message="handleSendMessage"
+      @send-file="handleSendFile"
+      :target-id="currentChat.id"
+      :chat-type="currentChat.type"
+    />
   </div>
   <div class="chat-placeholder" v-else>
     请从左侧选择一个聊天开始

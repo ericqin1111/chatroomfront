@@ -1,5 +1,8 @@
 <template>
   <div class="message-input-wrapper">
+
+
+
     <textarea
       ref="textareaRef"
       v-model="newMessage"
@@ -8,18 +11,43 @@
       rows="1"
       @input="adjustTextareaHeight"
     ></textarea>
+
+    <input
+      type="file"
+      ref="fileInputRef"
+      @change="handleFileSelected"
+      style="display: none"
+      accept="*"
+    />
+    <button @click="openFilePicker" class="file-button" title="选择文件">
+      + </button>
+
     <button @click="sendMessage" :disabled="isSendDisabled">发送</button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
+const props = defineProps<{
+  targetId: number | string; // 接收目标 ID (好友或群组 ID)
+  chatType: 'friend' | 'group'; // 接收聊天类型
+}>()
+
+// const newMessage = ref('')
+// const emit = defineEmits(['send-message'])
+// const textareaRef = ref<HTMLTextAreaElement | null>(null)
+
+// const isSendDisabled = computed(() => newMessage.value.trim().length === 0)
 
 const newMessage = ref('')
-const emit = defineEmits(['send-message'])
+// Include 'send-file' in the emitted events
+const emit = defineEmits(['send-message', 'send-file'])
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null) // Ref for the file input
 
 const isSendDisabled = computed(() => newMessage.value.trim().length === 0)
+
+
 
 const sendMessage = () => {
   const content = newMessage.value.trim()
@@ -51,6 +79,36 @@ const adjustTextareaHeight = () => {
     textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden'
   }
 }
+
+const openFilePicker = () => {
+  fileInputRef.value?.click()
+}
+
+const handleFileSelected = (event: Event) => {
+  const target = event.target as HTMLInputElement
+
+  
+  if (target.files && target.files.length > 0) {
+    const file = target.files[0] // Get the first selected file
+
+    console.log('Props received:', props);
+    console.log('File selected:', file);
+
+    // 在这里可以添加基于 props 的检查逻辑 (如果需要)
+    // 例如，检查 props.targetId 和 props.chatType 是否有效
+    if (!props.targetId || !props.chatType) {
+       console.error("MessageInput: targetId 或 chatType prop 无效或缺失!");
+       target.value = ''; // 重置输入，防止重复触发无效选择
+       return; // 提前退出，不发送事件
+    }
+
+    emit('send-file', file) // Emit the 'send-file' event with the File object
+
+    
+    // Reset the input value to allow selecting the same file again
+    target.value = ''
+  }
+}
 </script>
 
 <style scoped>
@@ -60,6 +118,7 @@ const adjustTextareaHeight = () => {
   padding: 10px 15px;
   border-top: 1px solid #e0e0e0;
   background-color: #f7f7f7; /* 输入区域背景色 */
+  gap: 10px;
 }
 
 textarea {
@@ -93,6 +152,10 @@ button {
   flex-shrink: 0; /* 防止按钮被压缩 */
   height: 38px; /* 与 textarea 初始高度对齐 */
   font-size: 14px;
+
+  display: inline-flex; /* Helps center content vertically */
+  align-items: center;
+  justify-content: center;
 }
 button:hover:not(:disabled) {
   background-color: #06ad56; /* 悬停颜色变深 */
@@ -100,5 +163,27 @@ button:hover:not(:disabled) {
 button:disabled {
   background-color: #a0e7b7; /* 禁用颜色 */
   cursor: not-allowed;
+}
+
+.file-button {
+  background-color: #6c757d; /* Gray color for file button */
+  width: 38px; /* Make it square-ish */
+  font-size: 18px; /* Adjust icon size */
+}
+.file-button:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+
+/* Send button specific styles */
+.send-button {
+  background-color: #07c160; /* WeChat green */
+  padding-left: 20px; /* More padding for text */
+  padding-right: 20px;
+}
+.send-button:hover:not(:disabled) {
+  background-color: #06ad56; /* Darker green on hover */
+}
+.send-button:disabled {
+  background-color: #a0e7b7; /* Disabled color */
 }
 </style>

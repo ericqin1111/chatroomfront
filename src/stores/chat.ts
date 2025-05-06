@@ -85,6 +85,7 @@ export interface FormattedMessageData {
   sentTime: string
   contentType: number // 1: text, 2: file
   groupId?: number // 群聊时才有
+  fileName?:string
 }
 
 // ---------------- Pinia Store 定义 ----------------
