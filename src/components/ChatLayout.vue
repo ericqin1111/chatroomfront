@@ -14,6 +14,7 @@ import AppSidebar from '@/components/AppSidebar.vue'
 import ChatArea from '@/components/ChatArea.vue'
 import { useChatStore } from '@/stores/chat'
 
+
 // 2. 获取 store 和 activeChatId
 const chatStore = useChatStore()
 const activeChatIdFromStore = computed(() => chatStore.activeChatId)

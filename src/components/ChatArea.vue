@@ -13,6 +13,7 @@ const authStore = useAuthStore(); // 获取 Auth Store
 
 // 从 Store 获取当前聊天信息
 const currentChat = computed(() => chatStore.currentChat);
+
 // 获取当前用户 ID (用于设置发送者)
 const currentUserId = computed(() => authStore.userId);
 
@@ -23,6 +24,8 @@ watch(currentChat, (newVal: Chat | null) => {
 
 const activeChatId = computed(() => chatStore.activeChatId);
 watch(activeChatId, (newId, oldId) => {
+  // chatStore.fetchChatList();
+  chatStore.fetchOnlineFriends();
   // 当 activeChatId 变化且不为 null 时
   if (newId !== null && newId !== oldId) {
     // 尝试从 store 获取新选中的聊天数据
@@ -158,7 +161,7 @@ export default defineComponent({ name: 'ChatArea' });
     <div class="chat-header">
       <div class="title">{{ currentChat.name }}</div>
     </div>
-    <MessageList :messages="currentChat.messages" class="message-list-component" />
+    <MessageList :messages="currentChat.messages" :chat-name="currentChat.name" class="message-list-component" />
     <!-- <MessageInput @send-message="handleSendMessage" class="message-input-component"/> -->
     <MessageInput
       v-if="currentChat"
@@ -166,6 +169,7 @@ export default defineComponent({ name: 'ChatArea' });
       @send-file="handleSendFile"
       :target-id="currentChat.id"
       :chat-type="currentChat.type"
+      
     />
   </div>
   <div class="chat-placeholder" v-else>

@@ -21,9 +21,14 @@
           :class="{ active: chat.id === activeChatId }" @click="selectChat(chat.id)"
           class="chat-item"
         >
+        <div class="avatar-container">
           <div class="avatar-placeholder">
               {{ chat.name.substring(0, 1) }}
           </div>
+          <span v-if="isFriendOnline(chat.id)" class="online-indicator"></span>
+
+        </div>
+          
           <div class="chat-info">
             <div class="chat-header">
               <span class="chat-name">{{ chat.name }}</span>
@@ -45,7 +50,7 @@
             <button class="action-button" @click="openAddFriendModal" title="添加好友">
               <font-awesome-icon icon="user-plus" />
              </button>
-             <button class="action-button" @click="handleCreateGroup" title="创建群聊">
+             <button class="action-button" @click="openCreateGroupModal" title="创建群聊">
               <font-awesome-icon icon="users" />
              </button>
         </div>
@@ -54,6 +59,12 @@
       :visible="isAddFriendModalVisible"
       @close="closeAddFriendModal"
       @send-request="handleSendFriendRequestFromModal"
+    />
+
+    <CreateGroupModal
+      :visible="isCreateGroupModalVisible"
+      :friends="friendListForModal" @close="closeCreateGroupModal"
+      @create="submitCreateGroup"
     />
         
 
@@ -79,14 +90,16 @@
             </ul>
          </div>
 
-         <div class="contact-section">
+         <!-- <div class="contact-section">
             <h3 class="contact-section-header">好友</h3>
              <ul class="contact-list">
                <li
                  v-for="friend in friendList"
                  :key="friend.id"
                  @click="selectChat(friend.id)"
-                 :class="{ active: friend.id === activeChatId }"
+                 :class="{ active: friend.id === activeChatId,
+                  'online': isFriendOnline(friend.id) // 新增：在线状态类
+                  }"
                  class="contact-item"
                 >
                     <div class="avatar-placeholder">
@@ -99,7 +112,34 @@
                     暂无好友
                 </li>
             </ul>
-         </div>
+         </div> -->
+         <div class="contact-section">
+    <h3 class="contact-section-header">好友</h3>
+    <ul class="contact-list">
+      <li
+        v-for="friend in friendList"
+        :key="friend.id"
+        @click="selectChat(friend.id)"
+        :class="{
+          'contact-item': true, /* 保留 contact-item 类 */
+          'active': friend.id === activeChatId,
+          'online': isFriendOnline(friend.id) /* 你已添加的在线状态类 */
+        }"
+        >
+        <div class="avatar-container">
+          <div class="avatar-placeholder">
+            <img v-if="friend.avatarUrl" :src="friend.avatarUrl" :alt="friend.name.substring(0, 1)" class="avatar-real">
+            <span v-else>{{ friend.name.substring(0, 1) }}</span>
+          </div>
+          <span v-if="isFriendOnline(friend.id)" class="online-indicator"></span>
+        </div>
+        <span class="contact-name">{{ friend.name }}</span>
+      </li>
+      <li v-if="friendList.length === 0" class="empty-list-placeholder">
+        暂无好友
+      </li>
+    </ul>
+  </div>
       </div>
 
       <div class="friend-requests-section" v-if="pendingFriendRequests.length > 0">
@@ -128,8 +168,9 @@
 <script setup lang="ts">
 // 导入需要的 Vue API 和 Pinia Store
 import { defineComponent, ref, computed,watch } from 'vue'
-import { useChatStore,type Chat } from '@/stores/chat' // 确认路径正确
+import { useChatStore,type Chat,isFriendOnline } from '@/stores/chat' // 确认路径正确
 import AddFriendModal from './AddFriendModel.vue';
+import CreateGroupModal from './CreateGroupModal.vue';
 
 
 // 接口定义
@@ -160,6 +201,16 @@ const chatListForSidebar = computed(() => chatStore.chatListForSidebar);
 // 从 store 获取当前激活的聊天 ID，用于高亮列表项
 const activeChatId = computed(() => chatStore.activeChatId);
 
+// 从 store 获取在线好友ID集合
+const onlineFriendIds = computed(() => chatStore.onlineFriendIds);
+
+// 方法：检查好友是否在线
+const isFriendOnline = (friendId: number): boolean => {
+  return onlineFriendIds.value.has(friendId);
+};
+
+
+
 // --- 定义方法 ---
 
 // 当用户点击聊天列表项时调用
@@ -174,13 +225,13 @@ const groupList = computed(() => {
   return Object.values(chatStore.chats).filter(chat => chat.type === 'group');
 });
 
-// 正确的写法：先获取对象的值（数组），再过滤
+
 const friendList = computed(() => {
-  // Object.values(chatStore.chats) 会返回一个包含所有 Chat 对象的数组
   return Object.values(chatStore.chats).filter(chat => chat.type === 'friend');
 });
 
 const isAddFriendModalVisible = ref(false);
+const isCreateGroupModalVisible = ref(false);
 
 const openAddFriendModal = () => {
   isAddFriendModalVisible.value = true;
@@ -188,6 +239,15 @@ const openAddFriendModal = () => {
 
 const closeAddFriendModal = () => {
   isAddFriendModalVisible.value = false;
+};
+
+const openCreateGroupModal = () => {
+  console.log('Opening create group modal...');
+  isCreateGroupModalVisible.value = true;
+};
+
+const closeCreateGroupModal = () => {
+  isCreateGroupModalVisible.value = false;
 };
 
 const handleSendFriendRequestFromModal = async (targetUserId: string) => { // 参数就是 Modal emit 出来的 identifier
@@ -203,13 +263,28 @@ const handleSendFriendRequestFromModal = async (targetUserId: string) => { // �
     // 出错时可以选择不关闭 Modal，让用户重试
   }
 };
-const handleCreateGroup = () => {
-    console.log('Trigger: Create Group');
-    // 在这里添加你的逻辑，例如：
-    // - 打开一个选择联系人创建群组的模态框
-    // - 导航到一个新的页面
-    // alert('创建群聊功能待实现');
+
+
+const friendListForModal = computed(() => {
+  return Object.values(chatStore.chats)
+    .filter(chat => chat.type === 'friend')
+    .map(friendChat => ({ id: friendChat.id, name: friendChat.name }));
+});
+
+const submitCreateGroup = async (groupData: { groupName: string; userIds: number[]; usernames: string[] }) => {
+  console.log('Attempting to create group with data:', groupData);
+  try {
+    await chatStore.createGroup(groupData.groupName, groupData.userIds, groupData.usernames);
+    alert('群组创建成功！');
+    closeCreateGroupModal();
+    // 刷新聊天列表的逻辑已经在 store action 中
+  } catch (error) {
+    console.error('创建群组失败 (来自侧边栏组件):', error);
+    alert((error as Error).message || '创建群组失败，请检查控制台获取更多信息。');
+    // 可选：在模态框内部显示错误，而不是用 alert
+  }
 };
+
 
 const pendingFriendRequests = computed(() => chatStore.pendingFriendRequests);
 
@@ -225,6 +300,8 @@ const handleDeclineRequest = (requestId: string | number) => {
 
 watch(activeTab, (newTabId, oldTabId) => {
   console.log(`Tab changed from ${oldTabId} to ${newTabId}`);
+
+
   // 当切换到 'contacts' 标签页时
   if (newTabId === 'contacts') {
     // 并且确保当前用户ID有效
@@ -232,7 +309,8 @@ watch(activeTab, (newTabId, oldTabId) => {
       console.log('Switched to contacts tab, fetching friend requests...');
       // 调用 store action 获取好友请求
       chatStore.fetchFriendRequests();
-      chatStore.fetchChatList();
+
+      chatStore.fetchOnlineFriends();
     } else {
       console.warn('Switched to contacts tab, but currentUserId is null, cannot fetch friend requests.');
       // 这里可以考虑监听 authStore 的登录状态，在登录后获取一次
@@ -249,6 +327,7 @@ watch(activeTab, (newTabId, oldTabId) => {
                      // 考虑到你可能在登录时已获取，这里设为 false 可能更合适，避免重复加载
   immediate: false
 });
+
 
 
 // setup 语法糖会自动暴露顶层绑定给模板，无需 return
@@ -348,6 +427,17 @@ export default defineComponent({
     background-color: #f0f0f0; /* 分割线颜色 */
 }
 
+.contact-item { /* 确保 .contact-item 有 display: flex 和 align-items: center */
+  display: flex;
+  align-items: center;
+  /* ... 你已有的 .contact-item 样式，如 padding, cursor, border-radius ... */
+}
+
+.avatar-container {
+  position: relative; /* 为 online-indicator 提供定位上下文 */
+  margin-right: 10px; /* 头像和名字之间的间距，如果你的 .avatar-placeholder 没有设置的话 */
+  flex-shrink: 0; /* 防止头像容器被压缩 */
+}
 
 /* --- 头像占位符 (来自你的样式) --- */
 .avatar-placeholder {
@@ -372,6 +462,27 @@ export default defineComponent({
     object-fit: cover; /* 确保图片覆盖区域 */
 }
 
+
+
+/* --- 【新增】在线指示器样式 --- */
+.online-indicator {
+  position: absolute; /* 相对于 .avatar-container 定位 */
+  bottom: 0px;      /* 定位到右下角 */
+  right: 0px;       /* 定位到右下角 */
+  width: 12px;      /* 小绿点的大小 */
+  height: 12px;     /* 小绿点的大小 */
+  background-color: #4CAF50; /* 绿色代表在线 */
+  border-radius: 50%;        /* 使其成为圆形 */
+  border: 2px solid white;   /* 给指示器一个白色边框，使其在头像上更突出 */
+  box-sizing: border-box;    /* 边框不会增加元素的总宽度/高度 */
+}
+
+/* --- 【新增/修改】在线状态的额外视觉反馈 (可选) --- */
+/* .contact-item.online .contact-name {
+
+  font-weight: bold;
+  color: #28a745; /* 例如，名字也变绿
+} */
 
 /* --- 聊天列表特定样式 (来自你的样式) --- */
 .chat-info {
@@ -510,5 +621,25 @@ export default defineComponent({
     margin-right: 10px;
     /* ... 其他搜索框样式 ... */
 }
+
+.online-indicator {
+  position: absolute; /* 相对于 .avatar-container 定位 */
+  bottom: 0px;      /* 定位到右下角 */
+  right: 0px;       /* 定位到右下角 */
+  width: 12px;      /* 小绿点的大小 */
+  height: 12px;     /* 小绿点的大小 */
+  background-color: #4CAF50; /* 绿色代表在线 */
+  border-radius: 50%;        /* 使其成为圆形 */
+  border: 2px solid white;   /* 给指示器一个白色边框，使其在头像上更突出 */
+  box-sizing: border-box;    /* 边框不会增加元素的总宽度/高度 */
+}
+
+/* --- 【新增/修改】在线状态的额外视觉反馈 (可选) --- */
+.contact-item.online .contact-name {
+  /* 你可以选择让在线好友的名字有不同样式 */
+  /* font-weight: bold; */
+  /* color: #28a745; */ /* 例如，名字也变绿 */
+}
+
 
 </style>

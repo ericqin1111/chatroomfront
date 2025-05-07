@@ -2,7 +2,7 @@
  * @Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
  * @Date: 2025-05-05 00:20:17
  * @LastEditors: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
- * @LastEditTime: 2025-05-07 10:47:25
+ * @LastEditTime: 2025-05-07 14:52:03
  * @FilePath: \chatroomreal\src\stores\chat.ts // 确认路径
  * @Description: Chat Store with Friend Request Logic
  */
@@ -112,6 +112,7 @@ export const useChatStore = defineStore('chat', () => {
     return Object.values(chats.value).sort((a, b) => (b.time || 0) - (a.time || 0));
   });
 
+  const onlineFriendIds = ref<Set<number>>(new Set());
   // --- Actions ---
 
   function setActiveChatId(id: number | null) {
@@ -122,8 +123,29 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function fetchOnlineFriends() {
+    try {
+      console.log('[ChatStore] Fetching online friend IDs...');
+      // 假设你的 request 工具能处理认证（如自动添加 Authorization header）
+      // 并且后端返回的是一个 ID 字符串数组，如 ["1", "2", "3"]
+      const response = await request.get<string[]>('/online'); // 使用你截图中的 /online 路径
+  
+      if (response && response.data && Array.isArray(response.data)) {
+        const ids = response.data.map(idStr => parseInt(idStr, 10)).filter(id => !isNaN(id));
+        onlineFriendIds.value = new Set(ids);
+        console.log('[ChatStore] Online friend IDs updated:', onlineFriendIds.value);
+      } else {
+        console.warn('[ChatStore] Received unexpected data for online friends:', response);
+        onlineFriendIds.value = new Set(); // 清空或保持上一次状态
+      }
+    } catch (error) {
+      console.error('[ChatStore] Failed to fetch online friends:', error);
+      // 出错时可以不清空，或者根据策略处理
+      // onlineFriendIds.value = new Set();
+    }
+  }
+
   async function fetchChatList() {
-     // ... (fetchChatList 实现保持不变) ...
       const userId = currentUserId.value
         if (!userId) {
             return
@@ -145,7 +167,6 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function fetchMessages(chatId: number | string) {
-     // ... (fetchMessages 实现保持不变，注意 RawMessageFromApi 的使用) ...
          const userId = currentUserId.value;
     // **使用 String() 确保 key 是字符串类型进行索引**
     const chatKey = String(chatId);
@@ -338,32 +359,6 @@ export const useChatStore = defineStore('chat', () => {
   function sendFileToGroup(targetId: number, file: File, content?: string) {
     wsInstance.value?.sendFileToGroup({ target: targetId, content }, file) // Service 中需要有此方法
   }
-  // --- 好友请求 Actions (保留修正后的版本) ---
-
-  // async function fetchFriendRequests() {
-  //   if (currentUserId.value === null) {
-  //     console.warn('[ChatStore] 当前用户ID未设置，无法获取好友请求。');
-  //     pendingFriendRequests.value = [];
-  //     return;
-  //   }
-  //   try {
-  //     const userId = currentUserId.value;
-  //     console.log(`[ChatStore] 正在为用户 ID ${userId} 获取好友请求...`);
-  //     const apiRequests: ApiFriendRequest[] = await request.get(
-  //       `/api/social/${userId}/friend-requests/pending` // 使用正确的 URL
-  //     );
-  //     pendingFriendRequests.value = apiRequests.map(apiReq => ({
-  //       id: apiReq.id,
-  //       senderId: apiReq.requesterId,
-  //       senderName: apiReq.requesterName,
-  //       timestamp: apiReq.createdAt,
-  //     }));
-  //     console.log('[ChatStore] 已获取并映射好友请求:', pendingFriendRequests.value);
-  //   } catch (error) {
-  //     console.error('[ChatStore] 获取好友请求失败:', error);
-  //     pendingFriendRequests.value = [];
-  //   }
-  // }
 
 
   function addMessageToActiveChat(message: Message) {
@@ -549,6 +544,50 @@ export const useChatStore = defineStore('chat', () => {
     } catch (error) { /* ... 错误处理 ... */ throw error; }
   }
 
+
+  async function createGroup(groupName: string, userIds: number[], usernames: string[]) {
+    const currentAuthUserId = authStore.userId; // 获取当前登录用户的ID，可能用于API路径或记录创建者
+    if (!currentAuthUserId) {
+      console.error('[ChatStore] Create group failed: User not authenticated.');
+      throw new Error('用户未认证，无法创建群组');
+    }
+
+    console.log(`[ChatStore] Attempting to create group: ${groupName} with users: ${userIds.join(', ')}`);
+
+    try {
+      // 假设你的后端创建群组 API 路径是 /api/group/create
+      // 并且它期望的请求体是 { groupName, userIds, usernames }
+      // 后端 Netty Handler 我们讨论的是 /api/group/create
+      // 如果你的实际后端路径是 /users/group/create 或其他，请相应修改
+      const response = await request.post<{ groupId: number; message: string }>(
+        `/api/group/create`, // <--- 确认这是你后端 Netty Handler 中定义的实际路径
+        {
+          groupName,
+          userIds,
+          usernames // 后端需要这个来设置成员别名等
+        }
+      );
+
+      console.log('[ChatStore] Group created successfully:', response.data);
+
+      // 群组创建成功后，刷新聊天列表以包含新群组
+      // 也可以根据后端返回的 response.data.groupId 直接将新群组添加到 chats.value 中（乐观更新或精确更新）
+      // 为简单起见，这里先刷新整个列表
+      await fetchChatList();
+
+      // 你可以返回新群组的 ID 或其他信息，如果需要
+      return response.data;
+
+    } catch (error) {
+      console.error('[ChatStore] Failed to create group:', error);
+      // 根据你的 request 封装，错误信息可能在 error.response.data.error 或其他地方
+      const errorMessage = (error as any)?.response?.data?.error || '创建群组失败，请稍后再试';
+      throw new Error(errorMessage);
+    }
+  }
+
+  
+
   // --- 返回 State 和 Actions ---
   // **确保包含了所有需要从组件中访问的 state 和 action**
   return {
@@ -577,6 +616,9 @@ export const useChatStore = defineStore('chat', () => {
     fetchFriendRequests,
     acceptFriendRequest,
     declineFriendRequest,
-    sendFriendRequest
+    sendFriendRequest,
+    createGroup,
+    onlineFriendIds,
+    fetchOnlineFriends
   };
 });
