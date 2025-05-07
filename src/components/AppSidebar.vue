@@ -232,6 +232,7 @@ watch(activeTab, (newTabId, oldTabId) => {
       console.log('Switched to contacts tab, fetching friend requests...');
       // 调用 store action 获取好友请求
       chatStore.fetchFriendRequests();
+      chatStore.fetchChatList();
     } else {
       console.warn('Switched to contacts tab, but currentUserId is null, cannot fetch friend requests.');
       // 这里可以考虑监听 authStore 的登录状态，在登录后获取一次

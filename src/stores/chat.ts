@@ -2,12 +2,12 @@
  * @Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
  * @Date: 2025-05-05 00:20:17
  * @LastEditors: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
- * @LastEditTime: 2025-05-07 00:58:05
+ * @LastEditTime: 2025-05-07 10:47:25
  * @FilePath: \chatroomreal\src\stores\chat.ts // 确认路径
  * @Description: Chat Store with Friend Request Logic
  */
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue'; // 移除了 nextTick (如果没用到)
+import { ref, computed,nextTick } from 'vue'; // 移除了 nextTick (如果没用到)
 import { WebSocketService } from '@/utils/websocket.ts'; // 确认路径
 import { useAuthStore } from './auth'; // 确认路径
 import request from '@/utils/request'; // 你的 request 封装实例
@@ -221,6 +221,8 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  
+
   function handleIncomingMessage(data: FormattedMessageData) {
      // ... (handleIncomingMessage 实现保持不变) ...
       if (data.senderId === currentUserId.value) {
@@ -363,6 +365,30 @@ export const useChatStore = defineStore('chat', () => {
   //   }
   // }
 
+
+  function addMessageToActiveChat(message: Message) {
+    if (activeChatId.value !== null && chats.value[activeChatId.value]) {
+      chats.value[activeChatId.value].messages.push(message); // 直接 push 传入的 message 对象
+      console.log('[ChatStore] Message added to active chat by object:', activeChatId.value);
+
+      // 更新最后消息和时间
+      const activeChat = chats.value[activeChatId.value];
+      activeChat.lastMessage = message.contentType === 1 ? message.content : (message.fileName || "[文件]");
+      activeChat.time = new Date(message.time).getTime();
+
+
+      // 可选：滚动逻辑
+      nextTick(() => {
+        // EventBus.emit('scrollToBottom', activeChatId.value);
+      });
+    } else {
+      console.warn('[ChatStore] Cannot add message, no active chat selected or chat data missing.');
+    }
+  }
+
+
+
+
   async function fetchFriendRequests() {
     if (currentUserId.value === null) {
       console.warn('[ChatStore] 当前用户ID未设置，无法获取好友请求。');
@@ -468,17 +494,21 @@ export const useChatStore = defineStore('chat', () => {
 
   async function acceptFriendRequest(requestId: number) {
     if (currentUserId.value === null) { /* ... */ return; }
+
+    const aliasName=localStorage.getItem('username');
+    console.log('[ACCEPTFRIENDREQUEST]:'+aliasName);
+    
     try {
       const userId = currentUserId.value;
       console.log(`[ChatStore] 用户 ${userId} 正在接受好友请求: ${requestId}`);
       await request.post(
-        `/api/social/${userId}/friend-requests/${requestId}/accept` // 使用正确的 URL
-        // 可选请求体 {} 或 { aliasName: '...' }
+        `/api/social/${userId}/friend-requests/${requestId}/accept`, // 使用正确的 URL
+         { aliasName: aliasName }
       );
       console.log(`[ChatStore] 已成功接受好友请求: ${requestId}`);
       pendingFriendRequests.value = pendingFriendRequests.value.filter(req => req.id !== requestId);
       // TODO: 刷新好友列表 fetchChatList();
-    } catch (error) { /* ... 错误处理 ... */ }
+    } catch (error) { console.log("Mistake") }
   }
 
   async function declineFriendRequest(requestId: number) {
@@ -486,7 +516,7 @@ export const useChatStore = defineStore('chat', () => {
     try {
       const userId = currentUserId.value;
       console.log(`[ChatStore] 用户 ${userId} 正在拒绝好友请求: ${requestId}`);
-      await request.post(
+      await request.get(
         `/api/social/${userId}/friend-requests/${requestId}/decline` // 使用正确的 URL
       );
       console.log(`[ChatStore] 已成功拒绝好友请求: ${requestId}`);
@@ -509,7 +539,7 @@ export const useChatStore = defineStore('chat', () => {
         console.log('[ChatStore] ACTION sendFriendRequest: currentUserId =', userId);
         console.log('[ChatStore] ACTION sendFriendRequest: targetUserId =', targetUserId);
         console.log('[ChatStore] ACTION sendFriendRequest: currentUserName =', currentUserName);
-        console.log('[ChatStore] ACTION sendFriendRequest: Payload Object BEFORE sending:', JSON.stringify(payload, null, 2));
+        // console.log('[ChatStore] ACTION sendFriendRequest: Payload Object BEFORE sending:', JSON.stringify(payload, null, 2));
 
         await request.post(
             `/api/social/${userId}/friend-requests/send`, // 使用正确的 URL
@@ -536,7 +566,7 @@ export const useChatStore = defineStore('chat', () => {
     setActiveChatId,
     fetchChatList,
     fetchMessages,
-    // addMessageToActiveChat, // 如果有的话
+    addMessageToActiveChat, // 如果有的话
     handleIncomingMessage, // 通常由ws回调内部调用，不一定需要导出
     initWebSocket,
     disconnectWebSocket,
